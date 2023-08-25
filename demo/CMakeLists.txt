@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(ETPS-Demo)
+project(FH-Demo)
 
 find_package(argparse CONFIG REQUIRED)
 
@@ -7,7 +7,7 @@ add_executable(demo main.cpp)
 
 target_link_libraries(demo
     PRIVATE
-    ETPS
+    FH
     ${OpenCV_LIBS}
     argparse::argparse)
 
