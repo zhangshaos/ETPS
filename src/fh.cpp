@@ -40,6 +40,7 @@ dist_rgb(cv::Vec3b a, cv::Vec3b b){
     F32 d = (F32)a[i] - (F32)b[i];
     result += d*d;
   }
+  result = std::sqrt(result);
   return result;
 }
 
