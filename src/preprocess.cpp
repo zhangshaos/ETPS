@@ -1,6 +1,6 @@
 #include "preprocess.h"
 #include <opencv2/imgproc.hpp>
-#define D_RGB2GRAD 1
+#define D_RGB2GRAD 0
 #if D_RGB2GRAD
 #include "print_cv_mat.h"
 #include <opencv2/imgcodecs.hpp>

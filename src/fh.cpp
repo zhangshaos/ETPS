@@ -26,6 +26,7 @@ struct MST{
   F32 mean_edge_weight = 0;
   F32 var_edge_weight = 0;
   F32 std_edge_weight = 0;
+  cv::Vec3b mean_rgb{0, 0, 0};
   int n_vertex = 0;
 };
 
@@ -83,7 +84,7 @@ weight_edge(int x0, int y0, int x1, int y1,
   assert(y1 >= 0 && y1 < rgb_img.rows);
   assert(x1 >= 0 && x1 < rgb_img.cols);
   F32 d = 0;
-#define PATCH_DIST 1
+#define PATCH_DIST 0
 #if PATCH_DIST
     d = std::sqrt(dist_rgb_patch(x0, y0, x1, y1, rgb_img, params.radius));
 #else
@@ -162,6 +163,7 @@ initialize(Graph &graph,
       auto &mst = graph.MST_forest[i];
       mst.n_vertex        = 1;
       mst.max_edge_weight = 0;
+      mst.mean_rgb        = rgb_img.at<cv::Vec3b>(y, x);
 
       const auto &adj_e = graph.adj_edges[i];
       F32 mean_w = 0;
@@ -211,11 +213,19 @@ weight_threshold_of_two_components(int id0, int id1,
   F32 v0 = mst0.max_edge_weight + (F32) params.k / (F32) mst0.n_vertex,
       v1 = mst1.max_edge_weight + (F32) params.k / (F32) mst1.n_vertex;
 #endif
-  F32 v0 = mst0.mean_edge_weight +
-           mst0.std_edge_weight * (F32)params.k_sigma_ratio;//2 sigma原则
-  F32 v1 = mst1.mean_edge_weight +
-           mst1.std_edge_weight * (F32)params.k_sigma_ratio;
-  return std::min(v0, v1);
+  F32 d = std::min(mst0.max_edge_weight, mst1.max_edge_weight);
+  d += dist_rgb(mst0.mean_rgb, mst1.mean_rgb);
+  return d;
+}
+
+cv::Vec3b
+mean_rgb_MST(const MST &l, const MST &r){
+  F32 a0 = (F32)l.n_vertex / (F32)(l.n_vertex + r.n_vertex),
+      a1 = (F32)r.n_vertex / (F32)(l.n_vertex + r.n_vertex);
+  F32 _r = (F32)l.mean_rgb[0] * a0 + (F32)r.mean_rgb[0] * a1,
+      _g = (F32)l.mean_rgb[1] * a0 + (F32)r.mean_rgb[1] * a1,
+      _b = (F32)l.mean_rgb[2] * a0 + (F32)r.mean_rgb[2] * a1;
+  return { (uchar)_r, (uchar)_g, (uchar)_b };
 }
 
 bool
@@ -238,22 +248,24 @@ try_merge(Graph &graph,
   auto &mst0 = graph.MST_forest[id0];
   auto &mst1 = graph.MST_forest[id1];
   //合并之后的MST就是原来的两个MST加上它们之间的最小边min_edge_weight
-  const F32 MST_max_weight = min_edge_weight;//边权重升序排列
-  const int MST_n_vertex   = mst0.n_vertex + mst1.n_vertex;
+  const F32 MST_max_weight     = min_edge_weight;//边权重升序排列
+  const int MST_n_vertex       = mst0.n_vertex + mst1.n_vertex;
+  const cv::Vec3b MST_mean_rgb = mean_rgb_MST(mst0, mst1);
   const F32 a_sum = std::max(1, mst0.n_vertex-1) + std::max(1, mst1.n_vertex-1) + 1;
   const F32 a0 = (F32)std::max(1, mst0.n_vertex-1) / a_sum,
             a1 = (F32)std::max(1, mst1.n_vertex-1) / a_sum,
             a2 = (F32)1                            / a_sum;
-  const F32 MST_mean_w     = a0 * mst0.mean_edge_weight +
-                             a1 * mst1.mean_edge_weight +
-                             a2 * min_edge_weight;
+  const F32 MST_mean_w  = a0 * mst0.mean_edge_weight +
+                          a1 * mst1.mean_edge_weight +
+                          a2 * min_edge_weight;
   const F32 d0 = MST_mean_w - mst0.mean_edge_weight,
             d1 = MST_mean_w - mst1.mean_edge_weight,
             d2 = MST_mean_w - min_edge_weight;
-  const F32 MST_var_w      = a0 * (mst0.var_edge_weight + d0*d0) +
-                             a1 * (mst1.var_edge_weight + d1*d1) +
-                             a2 * ((F32)0             + d2*d2);
+  const F32 MST_var_w   = a0 * (mst0.var_edge_weight + d0*d0) +
+                          a1 * (mst1.var_edge_weight + d1*d1) +
+                          a2 * ((F32)0             + d2*d2);
   mst0.n_vertex         = mst1.n_vertex         = MST_n_vertex;
+  mst0.mean_rgb         = mst1.mean_rgb         = MST_mean_rgb;
   mst0.max_edge_weight  = mst1.max_edge_weight  = MST_max_weight;
   mst0.mean_edge_weight = mst1.mean_edge_weight = MST_mean_w;
   mst0.var_edge_weight  = mst1.var_edge_weight  = MST_var_w;
