@@ -1,6 +1,6 @@
 #include "preprocess.h"
 #include <opencv2/imgproc.hpp>
-#define D_RGB2GRAD 0
+#define D_RGB2GRAD 1
 #if D_RGB2GRAD
 #include "print_cv_mat.h"
 #include <opencv2/imgcodecs.hpp>
@@ -69,60 +69,44 @@ canny(const cv::Mat_<uchar> &src, bool non_max_suppress=true, double blur_sigma=
   PI     = PI_8 * 8;
 
   //非极大值抑制
-  cv::Mat_<uchar> max_promote(result.rows, result.cols, (uchar)0);
-  for (int y = 0; y < result.rows; ++y)
-    for (int x = 0; x < result.cols; ++x) {
+  const cv::Mat_<uchar> nms_src_mat = result.clone();
+  for (int y = 0; y < nms_src_mat.rows; ++y)
+    for (int x = 0; x < nms_src_mat.cols; ++x) {
       float a = angle.at<float>(y, x);
       CV_Assert(-PI <= a && a <= PI);
-      uchar &v = result.at<uchar>(y, x);
+      uchar v = nms_src_mat.at<uchar>(y, x);
       if ((-PI_8 < a) && (a <= PI_8) ||
           (PI_7_8 < a) || (a <= -PI_7_8)) {
         //Horizontal Edge
-        if ((x < result.cols - 1) &&
-            (!max_promote.at<uchar>(y, x+1)) &&
-            (v <= result.at<uchar>(y, x+1)) ||
+        if ((x < nms_src_mat.cols - 1) &&
+            (v < nms_src_mat.at<uchar>(y, x+1)) ||
             (x >= 1) &&
-            (!max_promote.at<uchar>(y, x-1)) &&
-            (v <= result.at<uchar>(y, x-1)))
-          v = 0;
-        else
-          max_promote.at<uchar>(y, x) = 1;
+            (v < nms_src_mat.at<uchar>(y, x-1)))
+          result.at<uchar>(y, x) = 0;
       } else if ((-PI_5_8 < a) && (a <= -PI_3_8) ||
                  (PI_3_8 < a) && (a <= PI_5_8)) {
         //Vertical Edge
-        if ((y < result.rows - 1) &&
-            (!max_promote.at<uchar>(y+1, x)) &&
-            (v <= result.at<uchar>(y+1, x)) ||
+        if ((y < nms_src_mat.rows - 1) &&
+            (v < nms_src_mat.at<uchar>(y+1, x)) ||
             (y >= 1) &&
-            (!max_promote.at<uchar>(y-1, x)) &&
-            (v <= result.at<uchar>(y-1, x)))
-          v = 0;
-        else
-          max_promote.at<uchar>(y, x) = 1;
+            (v < nms_src_mat.at<uchar>(y-1, x)))
+          result.at<uchar>(y, x) = 0;
       } else if ((-PI_3_8 < a) && (a <= -PI_8) ||
                  (PI_5_8 < a) && (a <= PI_7_8)) {
         //-45 Degree Edge
-        if ((y >= 1 && x < result.cols - 1) &&
-            (!max_promote.at<uchar>(y-1, x+1)) &&
-            (v <= result.at<uchar>(y-1, x+1)) ||
-            (y < result.rows - 1 && x >= 1) &&
-            (!max_promote.at<uchar>(y+1, x-1)) &&
-            (v <= result.at<uchar>(y+1, x-1)))
-          v = 0;
-        else
-          max_promote.at<uchar>(y, x) = 1;
+        if ((y >= 1 && x < nms_src_mat.cols - 1) &&
+            (v < nms_src_mat.at<uchar>(y-1, x+1)) ||
+            (y < nms_src_mat.rows - 1 && x >= 1) &&
+            (v < nms_src_mat.at<uchar>(y+1, x-1)))
+          result.at<uchar>(y, x) = 0;
       } else if ((-PI_7_8 < a) && (a <= -PI_5_8) ||
                  (PI_8 < a) && (a <= PI_3_8)) {
         //45 Degree Edge
-        if ((y < result.rows - 1 && x < result.cols - 1) &&
-            (!max_promote.at<uchar>(y+1, x+1)) &&
-            (v <= result.at<uchar>(y+1, x+1)) ||
+        if ((y < nms_src_mat.rows - 1 && x < nms_src_mat.cols - 1) &&
+            (v < nms_src_mat.at<uchar>(y+1, x+1)) ||
             (y >= 1 && x >= 1) &&
-            (!max_promote.at<uchar>(y-1, x-1)) &&
-            (v <= result.at<uchar>(y-1, x-1)))
-          v = 0;
-        else
-          max_promote.at<uchar>(y, x) = 1;
+            (v < nms_src_mat.at<uchar>(y-1, x-1)))
+          result.at<uchar>(y, x) = 0;
       } else {
         CV_Assert(0 && "impossible!");
       }
@@ -131,69 +115,101 @@ canny(const cv::Mat_<uchar> &src, bool non_max_suppress=true, double blur_sigma=
 }
 
 
+template <typename T>
+inline
+cv::Mat_<T>
+standard(const cv::Mat_<T> &mat, double scale){
+  double min_value=0, max_value=0;
+  cv::minMaxIdx(mat, &min_value, &max_value);
+  cv::Mat_<T> result = mat.clone();
+  for (int y=0; y<mat.rows; ++y)
+    for (int x=0; x<mat.cols; ++x){
+      auto v = mat.template at<T>(y, x);
+      result.template at<T>(y, x) = (v - min_value) / (max_value - min_value) * scale;
+    }
+  return result;
+}
+
 cv::Mat_<uchar>
 rgb2grad(const cv::Mat_<cv::Vec3b> &rgb_img) {
 #if D_RGB2GRAD
-  {
-  {
-    cv::Mat t0(10, 10, CV_16S);
-    cv::Mat_<short> t1(10, 10);
-    printf("%s == %s\n",
-           cv::typeToString(t0.type()).c_str(),
-           cv::typeToString(t1.type()).c_str());
+  if constexpr(1) {
+    do {
+      cv::Mat t0(10, 10, CV_16S);
+      cv::Mat_<short> t1(10, 10);
+      printf("%s == %s\n",
+             cv::typeToString(t0.type()).c_str(),
+             cv::typeToString(t1.type()).c_str());
+      fflush(stdout);
+    } while (0);
+    cv::Mat_<uchar> gray_img;
+    cv::cvtColor(rgb_img, gray_img, cv::COLOR_RGB2GRAY);
+
+    cv::Mat lap_grad, sch_grad_x, sch_grad_y;
+    cv::Laplacian(gray_img, lap_grad, CV_16S, 3);
+    cv::Scharr(gray_img, sch_grad_x, CV_16S, 1, 0);
+    cv::Scharr(gray_img, sch_grad_y, CV_16S, 0, 1);
+    printf("%s, %s, %s\n",
+           cv::typeToString(lap_grad.type()).c_str(),
+           cv::typeToString(sch_grad_x.type()).c_str(),
+           cv::typeToString(sch_grad_y.type()).c_str());
     fflush(stdout);
+
+    cv::Mat lap_img, sch_img;
+    cv::convertScaleAbs(lap_grad, lap_img);
+    cv::Mat sch_x, sch_y;
+    cv::convertScaleAbs(sch_grad_x, sch_x);
+    cv::convertScaleAbs(sch_grad_y, sch_y);
+    cv::addWeighted(sch_x, 0.5, sch_y, 0.5, 0, sch_img);
+    printf("%s, %s\n",
+           cv::typeToString(lap_img.type()).c_str(),
+           cv::typeToString(sch_img.type()).c_str());
+    fflush(stdout);
+
+    cv::Mat_<cv::Vec3b> lab_img = rgb2lab(rgb_img);
+    cv::Mat_<uchar> lab[3];
+    cv::split(lab_img, lab);
+    lab[1] = standard(lab[1], 100);
+    lab[2] = standard(lab[2], 100);
+    auto canny_img_l = canny(lab[0]);
+    auto canny_img_a = canny(lab[1]);
+    auto canny_img_b = canny(lab[2]);
+    cv::Mat_<uchar>
+    canny_img_ab = cv::max(canny_img_a, canny_img_b);
+    cv::Mat_<uchar>
+    canny_img_lab = cv::max(canny_img_ab, canny_img_l);
+
+    cv::Mat edge_map;
+    cv::Canny(gray_img, edge_map, 25, 100, 3, true);
+    auto canny_img = canny(gray_img);
+
+    cv::imwrite("lap.png", lap_img);
+    cv::imwrite("scharr.png", sch_img);
+    cv::imwrite("canny.png", canny_img);
+    cv::imwrite("canny_l.png", canny_img_l);
+    cv::imwrite("canny_a.png", canny_img_a);
+    cv::imwrite("canny_b.png", canny_img_b);
+    cv::imwrite("canny_ab.png", canny_img_ab);
+    cv::imwrite("canny_lab.png", canny_img_lab);
+    cv::imwrite("edge.png", edge_map);
   }
-  cv::Mat_<uchar> gray_img;
-  cv::cvtColor(rgb_img, gray_img, cv::COLOR_RGB2GRAY);
+#endif
 
-  cv::Mat lap_grad, sch_grad_x, sch_grad_y;
-  cv::Laplacian(gray_img, lap_grad, CV_16S, 3);
-  cv::Scharr(gray_img, sch_grad_x, CV_16S, 1, 0);
-  cv::Scharr(gray_img, sch_grad_y, CV_16S, 0, 1);
-  printf("%s, %s, %s\n",
-         cv::typeToString(lap_grad.type()).c_str(),
-         cv::typeToString(sch_grad_x.type()).c_str(),
-         cv::typeToString(sch_grad_y.type()).c_str());
-  fflush(stdout);
-
-  cv::Mat lap_img, sch_img;
-  cv::convertScaleAbs(lap_grad, lap_img);
-  cv::Mat sch_x, sch_y;
-  cv::convertScaleAbs(sch_grad_x, sch_x);
-  cv::convertScaleAbs(sch_grad_y, sch_y);
-  cv::addWeighted(sch_x, 0.5, sch_y, 0.5, 0, sch_img);
-  printf("%s, %s\n",
-         cv::typeToString(lap_img.type()).c_str(),
-         cv::typeToString(sch_img.type()).c_str());
-  fflush(stdout);
-
-  cv::Mat lab_img = rgb2lab(rgb_img);
-  cv::Mat lab[3];
+  cv::Mat_<cv::Vec3b> lab_img = rgb2lab(rgb_img);
+  cv::Mat_<uchar> lab[3];
   cv::split(lab_img, lab);
+  lab[1] = standard(lab[1], 100);
+  lab[2] = standard(lab[2], 100);
   auto canny_img_l = canny(lab[0]);
   auto canny_img_a = canny(lab[1]);
   auto canny_img_b = canny(lab[2]);
-  cv::Mat canny_img_ab;
-  cv::addWeighted(canny_img_a, 1, canny_img_b, 1, 0, canny_img_ab, CV_8U);
-
-  cv::Mat edge_map;
-  cv::Canny(gray_img, edge_map, 25, 100, 3, true);
-  auto canny_img = canny(gray_img);
-
-  cv::imwrite("lap.png", lap_img);
-  cv::imwrite("scharr.png", sch_img);
-  cv::imwrite("canny.png", canny_img);
-  cv::imwrite("canny_l.png", canny_img_l);
-  cv::imwrite("canny_a.png", canny_img_a);
-  cv::imwrite("canny_b.png", canny_img_b);
-  cv::imwrite("canny_ab.png", canny_img_ab);
-  cv::imwrite("edge.png", edge_map);
-  }
-#endif
-  auto lab_img = rgb2lab(rgb_img);
-  cv::Mat_<uchar> lab[3];
-  cv::split(lab_img, lab);
-  //Future: merge l* a* b* result will be better?
-  auto result = canny(lab[0]);
+  cv::Mat_<uchar> result(rgb_img.rows, rgb_img.cols, (uchar) 0);
+  for (int y=0; y<rgb_img.rows; ++y)
+    for (int x=0; x<rgb_img.cols; ++x){
+      uchar l = canny_img_l.at<uchar>(y, x),
+            a = canny_img_a.at<uchar>(y, x),
+            b = canny_img_b.at<uchar>(y, x);
+      result.at<uchar>(y, x) = std::max(l, std::max(a, b));
+    }
   return result;
 }

@@ -28,6 +28,9 @@ int main(int argc, char *argv[]) {
 
   HyperParams params;
   params.k = 200;
+  params.visualize_step_ratio = 0.05f;
+  params.k_sigma_ratio = 1.5f;
+  params.rgb2lab = true;
 
   namespace time = std::chrono;
   auto t0 = time::steady_clock::now();

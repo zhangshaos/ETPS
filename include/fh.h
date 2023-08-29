@@ -5,6 +5,9 @@
 
 struct HyperParams{
   float k = 800;
+  float visualize_step_ratio = 0.1f;
+  int radius   = 1;
+  float k_sigma_ratio = 2.f;
   bool rgb2lab = true;
   bool verbose = true;
 
