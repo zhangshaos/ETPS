@@ -69,60 +69,44 @@ canny(const cv::Mat_<uchar> &src, bool non_max_suppress=true, double blur_sigma=
   PI     = PI_8 * 8;
 
   //非极大值抑制
-  cv::Mat_<uchar> max_promote(result.rows, result.cols, (uchar)0);
-  for (int y = 0; y < result.rows; ++y)
-    for (int x = 0; x < result.cols; ++x) {
+  const cv::Mat_<uchar> nms_src_mat = result.clone();
+  for (int y = 0; y < nms_src_mat.rows; ++y)
+    for (int x = 0; x < nms_src_mat.cols; ++x) {
       float a = angle.at<float>(y, x);
       CV_Assert(-PI <= a && a <= PI);
-      uchar &v = result.at<uchar>(y, x);
+      uchar v = nms_src_mat.at<uchar>(y, x);
       if ((-PI_8 < a) && (a <= PI_8) ||
           (PI_7_8 < a) || (a <= -PI_7_8)) {
         //Horizontal Edge
-        if ((x < result.cols - 1) &&
-            (!max_promote.at<uchar>(y, x+1)) &&
-            (v <= result.at<uchar>(y, x+1)) ||
+        if ((x < nms_src_mat.cols - 1) &&
+            (v < nms_src_mat.at<uchar>(y, x+1)) ||
             (x >= 1) &&
-            (!max_promote.at<uchar>(y, x-1)) &&
-            (v <= result.at<uchar>(y, x-1)))
-          v = 0;
-        else
-          max_promote.at<uchar>(y, x) = 1;
+            (v < nms_src_mat.at<uchar>(y, x-1)))
+          result.at<uchar>(y, x) = 0;
       } else if ((-PI_5_8 < a) && (a <= -PI_3_8) ||
-                 (PI_3_8 < a) && (a <= PI_5_8)) {
+          (PI_3_8 < a) && (a <= PI_5_8)) {
         //Vertical Edge
-        if ((y < result.rows - 1) &&
-            (!max_promote.at<uchar>(y+1, x)) &&
-            (v <= result.at<uchar>(y+1, x)) ||
+        if ((y < nms_src_mat.rows - 1) &&
+            (v < nms_src_mat.at<uchar>(y+1, x)) ||
             (y >= 1) &&
-            (!max_promote.at<uchar>(y-1, x)) &&
-            (v <= result.at<uchar>(y-1, x)))
-          v = 0;
-        else
-          max_promote.at<uchar>(y, x) = 1;
+            (v < nms_src_mat.at<uchar>(y-1, x)))
+          result.at<uchar>(y, x) = 0;
       } else if ((-PI_3_8 < a) && (a <= -PI_8) ||
-                 (PI_5_8 < a) && (a <= PI_7_8)) {
+          (PI_5_8 < a) && (a <= PI_7_8)) {
         //-45 Degree Edge
-        if ((y >= 1 && x < result.cols - 1) &&
-            (!max_promote.at<uchar>(y-1, x+1)) &&
-            (v <= result.at<uchar>(y-1, x+1)) ||
-            (y < result.rows - 1 && x >= 1) &&
-            (!max_promote.at<uchar>(y+1, x-1)) &&
-            (v <= result.at<uchar>(y+1, x-1)))
-          v = 0;
-        else
-          max_promote.at<uchar>(y, x) = 1;
+        if ((y >= 1 && x < nms_src_mat.cols - 1) &&
+            (v < nms_src_mat.at<uchar>(y-1, x+1)) ||
+            (y < nms_src_mat.rows - 1 && x >= 1) &&
+            (v < nms_src_mat.at<uchar>(y+1, x-1)))
+          result.at<uchar>(y, x) = 0;
       } else if ((-PI_7_8 < a) && (a <= -PI_5_8) ||
-                 (PI_8 < a) && (a <= PI_3_8)) {
+          (PI_8 < a) && (a <= PI_3_8)) {
         //45 Degree Edge
-        if ((y < result.rows - 1 && x < result.cols - 1) &&
-            (!max_promote.at<uchar>(y+1, x+1)) &&
-            (v <= result.at<uchar>(y+1, x+1)) ||
+        if ((y < nms_src_mat.rows - 1 && x < nms_src_mat.cols - 1) &&
+            (v < nms_src_mat.at<uchar>(y+1, x+1)) ||
             (y >= 1 && x >= 1) &&
-            (!max_promote.at<uchar>(y-1, x-1)) &&
-            (v <= result.at<uchar>(y-1, x-1)))
-          v = 0;
-        else
-          max_promote.at<uchar>(y, x) = 1;
+            (v < nms_src_mat.at<uchar>(y-1, x-1)))
+          result.at<uchar>(y, x) = 0;
       } else {
         CV_Assert(0 && "impossible!");
       }

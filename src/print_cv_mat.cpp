@@ -163,6 +163,7 @@ sample_color(double *color, double x, double min, double max) {
    * Green = 1
    * Blue = 2
    */
+  x = (x - min) / (max - min) * 360; //convert x to [0,360)
   double posSlope = (max - min) / 60;
   double negSlope = (min - max) / 60;
 
