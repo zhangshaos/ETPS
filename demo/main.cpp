@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <chrono>
-#include <etps.h>
+#include <ccs.h>
 #include <opencv2/opencv.hpp>
 #include <argparse/argparse.hpp>
 
@@ -11,8 +11,8 @@ void parse(){
 
 const std::string
 //img_path = "../demo/test_img/texture_compo.png";
-img_path = "../demo/test_img/UI_seq17_000700.jpg";
-//img_path = "../demo/test_img/6h00002.jpg";
+//img_path = "../demo/test_img/UI_seq17_000700.jpg";
+img_path = "../demo/test_img/6h00002.jpg";
 //img_path = "../demo/test_img/UD_000261.jpg";
 
 
@@ -27,14 +27,14 @@ int main(int argc, char *argv[]) {
   printf("%s\n", cv::typeToString(lab_img.type()).c_str());
 
   HyperParams params;
-  params.expect_spx_num = 500;
-  params.spatial_scale = 0.1;
+  params.expect_spx_num = 2000;
+  params.spatial_scale = 0.3;
 
   namespace time = std::chrono;
   auto t0 = time::steady_clock::now();
-  etps(rgb_img, params);
+  ccs(rgb_img, params);
   auto t1 = time::steady_clock::now();
   float used_sec = time::duration_cast<time::milliseconds>(t1 - t0).count() * 1e-3f;
-  printf("etps algorithm cost %.3f second", used_sec);
+  printf("ccs algorithm cost %.3f second", used_sec);
   return 0;
 }

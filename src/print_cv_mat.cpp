@@ -250,6 +250,9 @@ save_super_pixel(const std::string &file_path,
                  const cv::Mat_<cv::Vec3b> &rgb_img){
   auto ans = mark_boundaries(rgb_img, labels, cv::Vec3b(0xff, 0, 0));
   for (int j=spx_s.size()-1; j>=0; --j)
-    cv::drawMarker(ans, spx_s[j], cv::Scalar(0, 255, 0), cv::MARKER_STAR);
+    cv::drawMarker(ans, spx_s[j],
+                   cv::Scalar(0, 255, 0),
+                   cv::MARKER_CROSS,
+                   10);
   return save_image(file_path, ans, true);
 }

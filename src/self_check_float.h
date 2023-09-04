@@ -4,6 +4,7 @@
 #ifndef N_SELF_CHECK_FLOAT
 #include <exception>
 #include <cstdint>
+#include <cmath>
 #include "throw_exception.h"
 
 template<typename T>

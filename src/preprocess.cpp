@@ -1,4 +1,5 @@
 #include "preprocess.h"
+#include "self_check_float.h"
 #include <opencv2/imgproc.hpp>
 #define D_RGB2GRAD 0
 #if D_RGB2GRAD
@@ -8,9 +9,11 @@
 
 
 cv::Mat_<cv::Vec3b>
-rgb2lab(const cv::Mat_<cv::Vec3b> &rgb_img) {
+rgb2lab(const cv::Mat_<cv::Vec3b> &rgb_img, bool scale) {
   cv::Mat_<cv::Vec3b> lab_img;
   cv::cvtColor(rgb_img, lab_img, cv::COLOR_RGB2Lab);
+  if (!scale)
+    return lab_img;
   for (int y = rgb_img.rows - 1; y >= 0; --y)
     for (int x = rgb_img.cols - 1; x >= 0; --x) {
       float l = lab_img.at<cv::Vec3b>(y, x)[0];
@@ -33,6 +36,87 @@ bgr2lab(const cv::Mat_<cv::Vec3b> &bgr_img) {
   return lab_img;
 }
 
+inline
+uchar
+mean_along_h_edge(const cv::Mat_<uchar> &src,
+                  int x0, int y0, int r){
+  F64 result = 0;
+  int n = 0;
+  for (int dx=-r; dx<=r; ++dx){
+    int y = y0, x = x0 + dx;
+    if (y < 0 || y >= src.rows ||
+        x < 0 || x >= src.cols)
+      continue;
+    uchar v = src.at<uchar>(y, x);
+    result += (F64)v;
+    ++n;
+  }
+  assert(n > 0);
+  result /= (F64)n;
+  return (uchar) result;
+}
+
+inline
+uchar
+mean_along_v_edge(const cv::Mat_<uchar> &src,
+                  int x0, int y0, int r){
+  F64 result = 0;
+  int n = 0;
+  for (int dy=-r; dy<=r; ++dy){
+    int y = y0 + dy, x = x0;
+    if (y < 0 || y >= src.rows ||
+        x < 0 || x >= src.cols)
+      continue;
+    uchar v = src.at<uchar>(y, x);
+    result += (F64)v;
+    ++n;
+  }
+  assert(n > 0);
+  result /= (F64)n;
+  return (uchar) result;
+}
+
+inline
+uchar
+mean_along_slash_edge(const cv::Mat_<uchar> &src,
+                      int x0, int y0, int r){
+  F64 result = 0;
+  int n = 0;
+  for (int dy=-r; dy<=r; ++dy){
+    int dx = -dy;
+    int y = y0 + dy, x = x0 + dx;
+    if (y < 0 || y >= src.rows ||
+        x < 0 || x >= src.cols)
+      continue;
+    uchar v = src.at<uchar>(y, x);
+    result += (F64)v;
+    ++n;
+  }
+  assert(n > 0);
+  result /= (F64)n;
+  return (uchar) result;
+}
+
+inline
+uchar
+mean_along_backslash_edge(const cv::Mat_<uchar> &src,
+                          int x0, int y0, int r){
+  F64 result = 0;
+  int n = 0;
+  for (int dy=-r; dy<=r; ++dy){
+    int dx = dy;
+    int y = y0 + dy, x = x0 + dx;
+    if (y < 0 || y >= src.rows ||
+        x < 0 || x >= src.cols)
+      continue;
+    uchar v = src.at<uchar>(y, x);
+    result += (F64)v;
+    ++n;
+  }
+  assert(n > 0);
+  result /= (F64)n;
+  return (uchar) result;
+}
 
 //blur_sigma=0 means automatic selection by cv::GaussianBlur
 static
@@ -69,7 +153,35 @@ canny(const cv::Mat_<uchar> &src, bool non_max_suppress=true, double blur_sigma=
   PI     = PI_8 * 8;
 
   //非极大值抑制
-  const cv::Mat_<uchar> nms_src_mat = result.clone();
+  cv::Mat_<uchar> nms_src_mat(result.rows, result.cols, (uchar)0);
+  //抑制粗边
+  constexpr int nms_edge_r = 1;
+  for (int y = 0; y < result.rows; ++y)
+    for (int x = 0; x < result.cols; ++x) {
+      float a = angle.at<float>(y, x);
+      CV_Assert(-PI <= a && a <= PI);
+      uchar v = 0;
+      if ((-PI_8 < a) && (a <= PI_8) ||
+          (PI_7_8 < a) || (a <= -PI_7_8)) {
+        //Horizontal Edge
+        v = mean_along_h_edge(result, x, y, nms_edge_r);
+      } else if ((-PI_5_8 < a) && (a <= -PI_3_8) ||
+                 (PI_3_8 < a) && (a <= PI_5_8)) {
+        //Vertical Edge
+        v = mean_along_v_edge(result, x, y, nms_edge_r);
+      } else if ((-PI_3_8 < a) && (a <= -PI_8) ||
+                 (PI_5_8 < a) && (a <= PI_7_8)) {
+        //-45 Degree Edge
+        v = mean_along_slash_edge(result, x, y, nms_edge_r);
+      } else if ((-PI_7_8 < a) && (a <= -PI_5_8) ||
+                 (PI_8 < a) && (a <= PI_3_8)) {
+        //45 Degree Edge
+        v = mean_along_backslash_edge(result, x, y, nms_edge_r);
+      } else {
+        CV_Assert(0 && "impossible!");
+      }
+      nms_src_mat.at<uchar>(y, x) = v;
+    }
   for (int y = 0; y < nms_src_mat.rows; ++y)
     for (int x = 0; x < nms_src_mat.cols; ++x) {
       float a = angle.at<float>(y, x);
@@ -84,7 +196,7 @@ canny(const cv::Mat_<uchar> &src, bool non_max_suppress=true, double blur_sigma=
             (v < nms_src_mat.at<uchar>(y, x-1)))
           result.at<uchar>(y, x) = 0;
       } else if ((-PI_5_8 < a) && (a <= -PI_3_8) ||
-          (PI_3_8 < a) && (a <= PI_5_8)) {
+                 (PI_3_8 < a) && (a <= PI_5_8)) {
         //Vertical Edge
         if ((y < nms_src_mat.rows - 1) &&
             (v < nms_src_mat.at<uchar>(y+1, x)) ||
@@ -92,7 +204,7 @@ canny(const cv::Mat_<uchar> &src, bool non_max_suppress=true, double blur_sigma=
             (v < nms_src_mat.at<uchar>(y-1, x)))
           result.at<uchar>(y, x) = 0;
       } else if ((-PI_3_8 < a) && (a <= -PI_8) ||
-          (PI_5_8 < a) && (a <= PI_7_8)) {
+                 (PI_5_8 < a) && (a <= PI_7_8)) {
         //-45 Degree Edge
         if ((y >= 1 && x < nms_src_mat.cols - 1) &&
             (v < nms_src_mat.at<uchar>(y-1, x+1)) ||
@@ -100,7 +212,7 @@ canny(const cv::Mat_<uchar> &src, bool non_max_suppress=true, double blur_sigma=
             (v < nms_src_mat.at<uchar>(y+1, x-1)))
           result.at<uchar>(y, x) = 0;
       } else if ((-PI_7_8 < a) && (a <= -PI_5_8) ||
-          (PI_8 < a) && (a <= PI_3_8)) {
+                 (PI_8 < a) && (a <= PI_3_8)) {
         //45 Degree Edge
         if ((y < nms_src_mat.rows - 1 && x < nms_src_mat.cols - 1) &&
             (v < nms_src_mat.at<uchar>(y+1, x+1)) ||
@@ -174,7 +286,7 @@ rgb2grad(const cv::Mat_<cv::Vec3b> &rgb_img) {
   cv::imwrite("edge.png", edge_map);
   }
 #endif
-  auto lab_img = rgb2lab(rgb_img);
+  auto lab_img = rgb2lab(rgb_img, true);
   cv::Mat_<uchar> lab[3];
   cv::split(lab_img, lab);
   //Future: merge l* a* b* result will be better?

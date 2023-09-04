@@ -5,7 +5,7 @@
 
 
 cv::Mat_<cv::Vec3b>
-rgb2lab(const cv::Mat_<cv::Vec3b> &rgb_img);
+rgb2lab(const cv::Mat_<cv::Vec3b> &rgb_img, bool scale);
 
 cv::Mat_<cv::Vec3b>
 bgr2lab(const cv::Mat_<cv::Vec3b> &bgr_img);
