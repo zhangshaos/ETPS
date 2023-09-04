@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
   HyperParams params;
   params.expect_spx_num = 2000;
   params.spatial_scale = 0.3;
-
+  params.verbose = false;
   namespace time = std::chrono;
   auto t0 = time::steady_clock::now();
   ccs(rgb_img, params);

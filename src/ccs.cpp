@@ -48,7 +48,7 @@ initialize_hyper_params(const HyperParams &params, int diameter){
   params.spatial_scale      *= ((float)max_d_rgb / (float)max_d_spatial);
   params.min_edge_threshold =  (0.5f * diameter);
   params.max_iter_num       =  2 * diameter;
-  printf("%s(): spatial_scale=%f, min_edge_threshold=%d, max_iter_num=%d\n",
+  printf("%s(): spatial_scale=%f, min_edge_threshold=%d, max_iter_num=%d.\n",
          __func__, params.spatial_scale, params.min_edge_threshold, params.max_iter_num);
 }
 
@@ -174,7 +174,8 @@ dist_px2spx(cv::Point2i px,
   //F32 d_spatial = dist_spatial_geodesic(px, spx.xy_mean, grad);
   F32 d         = d_rgb + d_spatial * (F32)params.spatial_scale;
   while (params.verbose){
-    int r = rand() % (params.max_iter_num * params.expect_spx_num);
+    static int r = 0;
+    r = ++r % (params.max_iter_num * params.expect_spx_num);
     if (r > 0)
       //避免太多日志内容
       break;
@@ -352,7 +353,13 @@ ccs(const cv::Mat_<cv::Vec3b> &rgb_img,
     const HyperParams &params) {
   cv::Mat_<int> result;
   try {
+    namespace time = std::chrono;
+    auto t0 = time::steady_clock::now();
     result = ccs_(rgb_img, params);
+    auto t1 = time::steady_clock::now();
+    float used_sec = time::duration_cast<time::milliseconds>(t1 - t0).count() * 1e-3f;
+    if (params.verbose)
+      printf("%s algorithm cost %.3f second\n", __func__, used_sec);
   } catch (const std::exception &e) {
     printf("\nfunction-%s: Catch Error %s\n", __func__, e.what());
     fflush(stdout);
