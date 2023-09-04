@@ -23,7 +23,7 @@ target_compile_definitions(CCS
     PUBLIC
     _USE_MATH_DEFINES)
 
-set(ENABLE_CHECK_FLOAT_ERROR ON) #打开此项检查浮点数错误
+set(ENABLE_CHECK_FLOAT_ERROR OFF) #打开此项检查浮点数错误
 if(NOT ${ENABLE_CHECK_FLOAT_ERROR})
     target_compile_definitions(CCS
         PRIVATE

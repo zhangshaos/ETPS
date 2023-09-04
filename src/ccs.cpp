@@ -136,10 +136,10 @@ find_boundary_px(const cv::Mat_<int> &label,
 }
 
 
-std::set<int>
+std::vector<int>
 adjacent_spx(cv::Point2i px,
              const cv::Mat_<int> &label) {
-  std::set<int> adj_spx;
+  std::vector<int> adj_spx;
   constexpr int offset[][2] = {
       {-1, -1},// dx, dy
       { 0, -1},
@@ -150,14 +150,17 @@ adjacent_spx(cv::Point2i px,
       { 0,  1},
       { 1,  1}
   };
+  adj_spx.reserve(std::size(offset));
   for (int t=std::size(offset); t>=0; --t){
     int y = px.y + offset[t][1],
         x = px.x + offset[t][0];
     if (y < 0 || y >= label.rows || x < 0 || x >= label.cols)
       continue;
     int id = label.at<int>(y, x);
-    adj_spx.emplace(id);
+    adj_spx.emplace_back(id);
   }
+  std::sort(adj_spx.begin(), adj_spx.end());
+  adj_spx.erase(std::unique(adj_spx.begin(), adj_spx.end()), adj_spx.end());
   return adj_spx;
 }
 
