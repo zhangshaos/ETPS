@@ -273,8 +273,9 @@ ccs_(const cv::Mat_<cv::Vec3b> &rgb_img,
         spx_pos, label, rgb_img);
   }
 
-  cv::Mat_<uchar> grad = rgb2grad(rgb_img),
-                  edge = edge_mat(grad, params);
+  const cv::Mat_<uchar>
+      grad = rgb2grad(rgb_img),
+      edge = edge_mat(rgb2gray(rgb_img));
   if (params.verbose) {
     save_image("input_image_grad.png", grad);
     save_image("input_image_edge.png", edge);
@@ -328,8 +329,9 @@ ccs_(const cv::Mat_<cv::Vec3b> &rgb_img,
     }
   }
 
-  //fixme not work
-  label = check_connectivity(label, edge, params);
+  label = split_by_edge(label, edge, params);
+  //todo: 在迭代过程中分割是不是效果更好？
+  //todo: 合并一些小结构（像素数量小于0.x*cell-size）
   if (params.verbose) {
     save_edge_map(
         str_printf(512, "%s_mat_final.png", __func__),

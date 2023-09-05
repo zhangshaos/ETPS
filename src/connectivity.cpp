@@ -1,197 +1,157 @@
 #include "connectivity.h"
 #include "disjoint_set.h"
 #include "self_check_float.h"
+#include "draw_line.h"
+#include "print_cv_mat.h"
 #include <set>
+#include <opencv2/imgproc.hpp>
 
 
-inline
-bool
-continued_in_edge_mat(const cv::Mat_<uchar> &edge,
-                      int x0, int y0, int x1, int y1){
-  return !edge.at<uchar>(y0, x0) || edge.at<uchar>(y1, x1);
+cv::Mat_<uchar>
+edge_mat(const cv::Mat_<uchar> &img){
+  auto lsd = cv::createLineSegmentDetector(cv::LSD_REFINE_NONE);
+  std::vector<cv::Vec4i> lines;
+  lsd->detect(img, lines);
+  cv::Mat_<uchar> result(img.rows, img.cols, (uchar)0);
+  for (const auto &l : lines){
+    cv::Point2i p0(l[0], l[1]), p1(l[2], l[3]);
+    auto pxs = line_path(p0, p1);
+    for (auto px : pxs)
+      result.at<uchar>(px.y, px.x) = 0xff;
+  }
+  return result;
 }
 
 
 cv::Mat_<int>
-check_connectivity(const cv::Mat_<int> &label,
-                   const cv::Mat_<uchar> &edge,
-                   const HyperParams &param){
+split_by_edge(const cv::Mat_<int> &label,
+              const cv::Mat_<uchar> &edge_,
+              const HyperParams &params){
   constexpr int offset[][2] = {
       {-1, -1},//dx,dy
       { 0, -1},
       { 1, -1},
       {-1,  0},
+      { 1,  0},
+      {-1,  1},
+      { 0,  1},
+      { 1,  1},
   };
+  //避免8相邻时如下的穿透情况：
+  //xo 和 ox
+  //ox    xo
+  auto edge = edge_.clone();
+  for (int y0=0; y0<edge.rows-1; ++y0)
+    for (int x0=0; x0<edge.cols-1; ++x0){
+      int y1 = y0    , x1 = x0 + 1,
+          y2 = y0 + 1, x2 = x0    ,
+          y3 = y0 + 1, x3 = x0 + 1;
+      bool on_edge0 = edge.at<uchar>(y0, x0),
+           on_edge1 = edge.at<uchar>(y1, x1),
+           on_edge2 = edge.at<uchar>(y2, x2),
+           on_edge3 = edge.at<uchar>(y3, x3);
+      if (on_edge0 && on_edge3 && !on_edge1 && !on_edge2)
+        edge.at<uchar>(y2, x2) = 0xff;
+      else if (!on_edge0 && !on_edge3 && on_edge1 && on_edge2)
+        edge.at<uchar>(y3, x3) = 0xff;
+    }
+  //bugs：如果两条线段距离很近，通过上面的边缘修正方法会导致两条线段中间形成一个个小腔室，
+  // 造成结果中出现一个个孤立的小点。
+#if 0
+  save_edge_map("foo.edge.png", edge);
+#endif
 
-  DisjointSet dj_set;
-  int start_id = 0;
   cv::Mat_<int> result(label.rows, label.cols, -1);
+  int start_id = 0;
 
-  //first pass
+  cv::Mat_<uchar> extended(label.rows, label.cols, (uchar)0);
   for (int y0=0; y0<label.rows; ++y0)
     for (int x0=0; x0<label.cols; ++x0){
-      const int spx_id0  = label.at<int>(y0, x0);
-      //测试当前像素和过去像素的连通性
-      std::set<int> connected;
-      for (int j=std::size(offset)-1; j>=0; --j){
-        int y = y0 + offset[j][1],
-            x = x0 + offset[j][0];
-        if (y < 0 || y >= label.rows ||
-            x < 0 || x >= label.cols)
-          continue;
-        const int spx_id1 = label.at<int>(y, x);
-        if (spx_id1 != spx_id0)
-          continue;
-        if (continued_in_edge_mat(edge, x0, y0, x, y)) {
-          int id = result.at<int>(y, x);
-          assert(id >= 0);
-          id = dj_set.find_root_class(id);
-          assert(id >= 0);
-          connected.emplace(id);
+      if (extended.at<uchar>(y0, x0) || edge.at<uchar>(y0, x0))
+        //如果边缘像素作为DFS起点，则只会找到这条边
+        continue;
+      const int id0 = label.at<int>(y0, x0);
+      //DFS找到所有未被线段阻隔的像素
+      std::vector<cv::Point2i> accessed;
+      std::vector<cv::Point2i> extend_stack;
+      extend_stack.emplace_back(x0, y0);
+      extended.at<uchar>(y0, x0) = 1;
+      while (!extend_stack.empty()){
+        auto top = extend_stack.back();
+        extend_stack.pop_back();
+        accessed.emplace_back(top);
+        assert(extended.at<uchar>(top.y, top.x));
+        const bool on_edge = edge.at<uchar>(top.y, top.x);
+
+        for (int j=std::size(offset)-1; j>=0; --j){
+          int y = top.y + offset[j][1],
+              x = top.x + offset[j][0];
+          if(y < 0 || y >= label.rows ||
+             x < 0 || x >= label.cols ||
+             label.at<int>(y, x) != id0 ||
+             extended.at<uchar>(y, x))
+            continue;
+          if(on_edge && !edge.at<uchar>(y, x))
+            //处于边界上的像素，只能向其他边界像素扩展
+            continue;
+          extend_stack.emplace_back(x, y);
+          extended.at<uchar>(y, x) = 1;
         }
       }
+      for (auto p : accessed)
+        result.at<int>(p.y, p.x) = start_id;
+      ++start_id;
+    }
 
-      int cur_id = -1;
-      if(connected.empty()){
-        cur_id = start_id++;
-        dj_set.try_add_class(cur_id);
-        result.at<int>(y0, x0) = cur_id;
-      } else {
-        cur_id = *connected.begin();//最小值
-        if(connected.size() > 1){
-          auto it = connected.begin();
-          while (++it != connected.end())
-            dj_set.union_class(cur_id, *it);//合并结果是最小的那一个
+  //处理全在边缘的一组相同label的像素（即，该label对应的所有像素都是边缘像素）
+  for (int y0=0; y0<label.rows; ++y0)
+    for (int x0=0; x0<label.cols; ++x0) {
+      if (extended.at<uchar>(y0, x0))
+        continue;
+      assert(edge.at<uchar>(y0, x0));
+      const int id0 = label.at<int>(y0, x0);
+      //DFS找到所有像素
+      std::vector<cv::Point2i> extend_stack;
+      extend_stack.emplace_back(x0, y0);
+      extended.at<uchar>(y0, x0) = 1;
+      while (!extend_stack.empty()){
+        auto top = extend_stack.back();
+        extend_stack.pop_back();
+        assert(extended.at<uchar>(top.y, top.x));
+        assert(edge.at<uchar>(top.y, top.x));
+        result.at<int>(top.y, top.x) = start_id;
+
+        for (int j=std::size(offset)-1; j>=0; --j){
+          int y = top.y + offset[j][1],
+              x = top.x + offset[j][0];
+          if(y < 0 || y >= label.rows ||
+             x < 0 || x >= label.cols ||
+             label.at<int>(y, x) != id0 ||
+             extended.at<uchar>(y, x))
+            continue;
+          assert(edge.at<uchar>(y, x));
+          extend_stack.emplace_back(x, y);
+          extended.at<uchar>(y, x) = 1;
         }
-        result.at<int>(y0, x0) = cur_id;
       }
-      assert(cur_id >= 0);
+      ++start_id;
     }
 
-  //second pass
-  std::vector<uint32_t> shrink_parent;
-  dj_set.shrink_parent(&shrink_parent);
-  for (int y=0; y<label.rows; ++y)
-    for (int x=0; x<label.cols; ++x){
-      int c = result.at<int>(y, x);
-      assert(c >= 0);
-      c = (int) shrink_parent[c];
-      result.at<int>(y, x) = c;
-    }
+#ifndef NDEBUG
+  double min_v=0, max_v=0;
+  cv::minMaxIdx(result, &min_v, &max_v);
+  assert(min_v >= 0);
+#endif
 
   return result;
 }
 
 
 #if 0
-inline
-bool
-continued_grad(F64 grad0, F64 grad1, const HyperParams &params){
-  return std::abs( float(grad0 - grad1) ) <= params.continued_grad_scale * 255.f;
-}
-
-
 cv::Mat_<int>
-check_connectivity(const cv::Mat_<int> &label,
-                   const cv::Mat_<uchar> &grad,
-                   const HyperParams &param){
-  constexpr int offset[][2] = {
-      {-1, -1},//dx,dy
-      { 0, -1},
-      { 1, -1},
-      {-1,  0},
-  };
-
-  DisjointSet dj_set;
-  struct Grad_Count{
-    F64 grad = 0;
-    int count = 0;
-  };
-  std::unordered_map<int, Grad_Count> grad_counter;
-  grad_counter.reserve(param.expect_spx_num * 2);
-  int start_id = 0;
-  cv::Mat_<int> result(label.rows, label.cols, -1);
-
-  //first pass
-  for (int y0=0; y0<label.rows; ++y0)
-    for (int x0=0; x0<label.cols; ++x0){
-      const int spx_id0  = label.at<int>(y0, x0);
-      const uchar grad0  = grad.at<uchar>(y0, x0);
-      //测试当前像素和过去像素的连通性
-      std::set<int> connected;
-      for (int j=std::size(offset)-1; j>=0; --j){
-        int y = y0 + offset[j][1],
-            x = x0 + offset[j][0];
-        if (y < 0 || y >= label.rows ||
-            x < 0 || x >= label.cols)
-          continue;
-        const int spx_id1 = label.at<int>(y, x);
-        if (spx_id1 != spx_id0)
-          continue;
-        int id = result.at<int>(y, x);
-        assert(id >= 0);
-        id = dj_set.find_root_class(id);
-        assert(id >= 0);
-        F64 grad_mean = grad_counter.at(id).grad / (F64) grad_counter.at(id).count;
-        if (continued_grad((F64) grad0, grad_mean, param))
-          connected.emplace(id);
-      }
-
-      int cur_id = -1;
-      if(connected.empty()){
-        cur_id = start_id++;
-        dj_set.try_add_class(cur_id);
-        result.at<int>(y0, x0) = cur_id;
-      } else {
-        cur_id = *connected.begin();//最小值
-        if(connected.size() > 1){
-          //尝试合并可以合并的
-          for (int id : connected){
-            if (id == cur_id)
-              continue;
-            F64 m0 = grad_counter.at(cur_id).grad / (F64) grad_counter.at(cur_id).count,
-                m1 = grad_counter.at(id).grad / (F64) grad_counter.at(id).count;
-            if (!continued_grad(m0, m1, param))
-              continue;
-            dj_set.union_class(cur_id, id);//合并结果是最小的那一个
-            int count_ = grad_counter.at(cur_id).count + grad_counter.at(id).count;
-            F64 grad_  = grad_counter.at(cur_id).grad + grad_counter.at(id).grad;
-            grad_counter.at(cur_id).count = grad_counter.at(id).count = count_;
-            grad_counter.at(cur_id).grad  = grad_counter.at(id).grad  = grad_;
-          }
-        }
-        result.at<int>(y0, x0) = cur_id;
-      }
-
-      assert(cur_id >= 0);
-      if (grad_counter.count(cur_id)){
-        grad_counter[cur_id].count++;
-        grad_counter[cur_id].grad += (F64) grad0;
-      } else {
-        grad_counter[cur_id].count = 1;
-        grad_counter[cur_id].grad = grad0;
-      }
-    }
-
-  //second pass
-  std::vector<uint32_t> shrink_parent;
-  dj_set.shrink_parent(&shrink_parent);
-  for (int y=0; y<label.rows; ++y)
-    for (int x=0; x<label.cols; ++x){
-      int c = result.at<int>(y, x);
-      assert(c >= 0);
-      c = (int) shrink_parent[c];
-      result.at<int>(y, x) = c;
-    }
-
-  return result;
-}
-#endif
-
-
-cv::Mat_<uchar>
-edge_mat(const cv::Mat_<uchar> &grad,
-         const HyperParams &params){
+split_by_line(const cv::Mat_<int> &label,
+              const std::vector<cv::Vec4i> &lines_segment,
+              const HyperParams &params){
   constexpr int offset[][2] = {
       {-1, -1},//dx,dy
       { 0, -1},
@@ -203,57 +163,59 @@ edge_mat(const cv::Mat_<uchar> &grad,
       { 1,  1},
   };
 
-  F64 mean_grad = 0;
-  int count = 0;
-  for (int y=0; y<grad.rows; ++y)
-    for (int x=0; x<grad.cols; ++x) {
-      uchar v = grad.at<uchar>(y, x);
-      if (v <= 0)
-        continue;
-      mean_grad += (F64)v;
-      ++count;
-    }
-  mean_grad = count > 0 ? mean_grad / (F64)count : (F64)0;
-  cv::Mat_<uchar> result(grad.rows, grad.cols, (uchar)0);
-  for (int y=0; y<grad.rows; ++y)
-    for (int x=0; x<grad.cols; ++x) {
-      uchar v = grad.at<uchar>(y, x);
-      if (v <= mean_grad)
-        continue;
-      result.at<uchar>(y, x) = 0xff;
-    }
+  //加速结构：线段和超像素相交判断
+  double min_v=0, max_v=0;
+  cv::minMaxIdx(label, &min_v, &max_v);
+  assert(min_v >= 0);
+  const int n_spx = (int) max_v;
+  struct BBox{
+    float x_min=std::numeric_limits<float>::max(), x_max=0,
+          y_min=std::numeric_limits<float>::max(), y_max=0;
+    std::vector<cv::Vec3f> pxs;
+  };
+  std::vector<BBox> spx_bbox(n_spx);
 
-  //删除很短的边
-  cv::Mat_<uchar> extended(result.rows, result.cols, (uchar)0);
-  for (int y0=0; y0<result.rows; ++y0)
-    for (int x0=0; x0<result.cols; ++x0){
-      if (result.at<uchar>(y0, x0)<=0 || extended.at<uchar>(y0, x0)>0)
+  cv::Mat_<uchar> extended(label.rows, label.cols, (uchar)0);
+  for (int y0=0; y0<label.rows; ++y0)
+    for (int x0=0; x0<label.cols; ++x0){
+      if (extended.at<uchar>(y0, x0))
         continue;
-      //DFS统计边大小
-      std::vector<cv::Point2i> accessed;
+      const int id0 = label.at<int>(y0, x0);
+      auto &bbox    = spx_bbox[id0];
+      //DFS找到所有id相同的像素
       std::vector<cv::Point2i> extend_stack;
       extend_stack.emplace_back(x0, y0);
       extended.at<uchar>(y0, x0) = 1;
       while (!extend_stack.empty()){
         auto top = extend_stack.back();
         extend_stack.pop_back();
-        accessed.emplace_back(top);
         assert(extended.at<uchar>(top.y, top.x));
+        float x_ = top.x + 0.5f, y_ = top.y + 0.5f;
+        bbox.pxs.emplace_back(x_, y_, 0.f);
+        bbox.x_max = std::max(bbox.x_max, x_);
+        bbox.x_min = std::min(bbox.x_min, x_);
+        bbox.y_max = std::max(bbox.y_max, y_);
+        bbox.y_min = std::min(bbox.y_min, y_);
 
         for (int j=std::size(offset)-1; j>=0; --j){
           int y = top.y + offset[j][1],
               x = top.x + offset[j][0];
-          if(y < 0 || y >= result.rows ||
-             x < 0 || x >= result.cols ||
-             result.at<uchar>(y, x)<=0 || extended.at<uchar>(y, x)>0)
+          if(y < 0 || y >= label.rows ||
+             x < 0 || x >= label.cols ||
+             label.at<int>(y, x) != id0 ||
+             extended.at<uchar>(y, x))
             continue;
           extend_stack.emplace_back(x, y);
           extended.at<uchar>(y, x) = 1;
         }
       }
-      if (accessed.size() < params.min_edge_threshold)
-        for (auto p : accessed)
-          result.at<uchar>(p.y, p.x) = 0;
     }
+
+  //线段将相交的超像素包含的所有像素一分为二
+  cv::Mat_<int> result(label.rows, label.cols, -1);
+  int start_id = 0;
+
+  //bugs: 无法将被四边形包围住的部分从整个超像素中分出来
   return result;
 }
+#endif

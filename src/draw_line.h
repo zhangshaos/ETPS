@@ -26,6 +26,7 @@ line_path(cv::Point2i p0, cv::Point2i p1){
   assert(std::abs(x_inc) >= 1.f || std::abs(y_inc) >= 1.f);
 
   std::vector<cv::Point2i> result;
+  result.reserve(n_step + 1);
   float x = p0.x, y = p0.y;
   result.emplace_back(float_round(x), float_round(y));
   for (int k=n_step; k>0; --k){

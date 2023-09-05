@@ -6,14 +6,13 @@
 
 
 cv::Mat_<int>
-check_connectivity(const cv::Mat_<int> &label,
-                   const cv::Mat_<uchar> &edge,
-                   const HyperParams &params);
+split_by_edge(const cv::Mat_<int> &label,
+              const cv::Mat_<uchar> &edge,
+              const HyperParams &params);
 
 
 cv::Mat_<uchar>
-edge_mat(const cv::Mat_<uchar> &grad,
-         const HyperParams &params);
+edge_mat(const cv::Mat_<uchar> &img);
 
 
 #endif //CCS_SRC_CONNECTIVITY_H_

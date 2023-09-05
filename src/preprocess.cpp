@@ -231,65 +231,73 @@ cv::Mat_<uchar>
 rgb2grad(const cv::Mat_<cv::Vec3b> &rgb_img) {
 #if D_RGB2GRAD
   {
-  {
-    cv::Mat t0(10, 10, CV_16S);
-    cv::Mat_<short> t1(10, 10);
-    printf("%s == %s\n",
-           cv::typeToString(t0.type()).c_str(),
-           cv::typeToString(t1.type()).c_str());
+    {
+      cv::Mat t0(10, 10, CV_16S);
+      cv::Mat_<short> t1(10, 10);
+      printf("%s == %s\n",
+             cv::typeToString(t0.type()).c_str(),
+             cv::typeToString(t1.type()).c_str());
+      fflush(stdout);
+    }
+    cv::Mat_<uchar> gray_img;
+    cv::cvtColor(rgb_img, gray_img, cv::COLOR_RGB2GRAY);
+
+    cv::Mat lap_grad, sch_grad_x, sch_grad_y;
+    cv::Laplacian(gray_img, lap_grad, CV_16S, 3);
+    cv::Scharr(gray_img, sch_grad_x, CV_16S, 1, 0);
+    cv::Scharr(gray_img, sch_grad_y, CV_16S, 0, 1);
+    printf("%s, %s, %s\n",
+           cv::typeToString(lap_grad.type()).c_str(),
+           cv::typeToString(sch_grad_x.type()).c_str(),
+           cv::typeToString(sch_grad_y.type()).c_str());
     fflush(stdout);
-  }
-  cv::Mat_<uchar> gray_img;
-  cv::cvtColor(rgb_img, gray_img, cv::COLOR_RGB2GRAY);
 
-  cv::Mat lap_grad, sch_grad_x, sch_grad_y;
-  cv::Laplacian(gray_img, lap_grad, CV_16S, 3);
-  cv::Scharr(gray_img, sch_grad_x, CV_16S, 1, 0);
-  cv::Scharr(gray_img, sch_grad_y, CV_16S, 0, 1);
-  printf("%s, %s, %s\n",
-         cv::typeToString(lap_grad.type()).c_str(),
-         cv::typeToString(sch_grad_x.type()).c_str(),
-         cv::typeToString(sch_grad_y.type()).c_str());
-  fflush(stdout);
+    cv::Mat lap_img, sch_img;
+    cv::convertScaleAbs(lap_grad, lap_img);
+    cv::Mat sch_x, sch_y;
+    cv::convertScaleAbs(sch_grad_x, sch_x);
+    cv::convertScaleAbs(sch_grad_y, sch_y);
+    cv::addWeighted(sch_x, 0.5, sch_y, 0.5, 0, sch_img);
+    printf("%s, %s\n",
+           cv::typeToString(lap_img.type()).c_str(),
+           cv::typeToString(sch_img.type()).c_str());
+    fflush(stdout);
 
-  cv::Mat lap_img, sch_img;
-  cv::convertScaleAbs(lap_grad, lap_img);
-  cv::Mat sch_x, sch_y;
-  cv::convertScaleAbs(sch_grad_x, sch_x);
-  cv::convertScaleAbs(sch_grad_y, sch_y);
-  cv::addWeighted(sch_x, 0.5, sch_y, 0.5, 0, sch_img);
-  printf("%s, %s\n",
-         cv::typeToString(lap_img.type()).c_str(),
-         cv::typeToString(sch_img.type()).c_str());
-  fflush(stdout);
+    cv::Mat lab_img = rgb2lab(rgb_img, true);
+    cv::Mat lab[3];
+    cv::split(lab_img, lab);
+    auto canny_img_l = canny(lab[0]);
+    auto canny_img_a = canny(lab[1]);
+    auto canny_img_b = canny(lab[2]);
+    cv::Mat canny_img_ab;
+    cv::addWeighted(canny_img_a, 1, canny_img_b, 1, 0, canny_img_ab, CV_8U);
 
-  cv::Mat lab_img = rgb2lab(rgb_img);
-  cv::Mat lab[3];
-  cv::split(lab_img, lab);
-  auto canny_img_l = canny(lab[0]);
-  auto canny_img_a = canny(lab[1]);
-  auto canny_img_b = canny(lab[2]);
-  cv::Mat canny_img_ab;
-  cv::addWeighted(canny_img_a, 1, canny_img_b, 1, 0, canny_img_ab, CV_8U);
+    cv::Mat edge_map;
+    cv::Canny(gray_img, edge_map, 25, 100, 3, true);
+    auto canny_img = canny(gray_img);
 
-  cv::Mat edge_map;
-  cv::Canny(gray_img, edge_map, 25, 100, 3, true);
-  auto canny_img = canny(gray_img);
-
-  cv::imwrite("lap.png", lap_img);
-  cv::imwrite("scharr.png", sch_img);
-  cv::imwrite("canny.png", canny_img);
-  cv::imwrite("canny_l.png", canny_img_l);
-  cv::imwrite("canny_a.png", canny_img_a);
-  cv::imwrite("canny_b.png", canny_img_b);
-  cv::imwrite("canny_ab.png", canny_img_ab);
-  cv::imwrite("edge.png", edge_map);
+    cv::imwrite("lap.png", lap_img);
+    cv::imwrite("scharr.png", sch_img);
+    cv::imwrite("canny.png", canny_img);
+    cv::imwrite("canny_l.png", canny_img_l);
+    cv::imwrite("canny_a.png", canny_img_a);
+    cv::imwrite("canny_b.png", canny_img_b);
+    cv::imwrite("canny_ab.png", canny_img_ab);
+    cv::imwrite("edge.png", edge_map);
   }
 #endif
   auto lab_img = rgb2lab(rgb_img, true);
   cv::Mat_<uchar> lab[3];
   cv::split(lab_img, lab);
-  //Future: merge l* a* b* result will be better?
+  //after test, merge l* a* b* result will be the same as l* only!
   auto result = canny(lab[0]);
+  return result;
+}
+
+
+cv::Mat_<uchar>
+rgb2gray(const cv::Mat_<cv::Vec3b> &rgb_img){
+  cv::Mat_<uchar> result;
+  cv::cvtColor(rgb_img, result, cv::COLOR_RGB2GRAY);
   return result;
 }

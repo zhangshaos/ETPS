@@ -19,3 +19,10 @@ set_target_properties(demo
     PROPERTIES
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
+
+
+add_executable(t_lsd t.cpp)
+target_link_libraries(t_lsd
+    PRIVATE
+    ${OpenCV_LIBS}
+)

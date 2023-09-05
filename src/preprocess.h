@@ -11,6 +11,9 @@ cv::Mat_<cv::Vec3b>
 bgr2lab(const cv::Mat_<cv::Vec3b> &bgr_img);
 
 cv::Mat_<uchar>
-rgb2grad(const cv::Mat_<cv::Vec3b> &gray_img);
+rgb2grad(const cv::Mat_<cv::Vec3b> &rgb_img);
+
+cv::Mat_<uchar>
+rgb2gray(const cv::Mat_<cv::Vec3b> &rgb_img);
 
 #endif //TASP_SRC_PREPROCESS_H_
