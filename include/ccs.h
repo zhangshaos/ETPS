@@ -5,6 +5,7 @@
 
 struct HyperParams{
   int           expect_spx_num        = 1000;
+  mutable int   expect_spx_diameter   = 0;//会根据expect_spx_num和图片尺寸而自动选择
   mutable float spatial_scale         = 0.3f;//设置初值，之后算法根据expect_spx_num和图片尺寸调整该项
   mutable int   max_iter_num          = 0;//会根据expect_spx_num和图片尺寸而自动选择
   mutable int   min_edge_threshold    = 0;//会根据expect_spx_num和图片尺寸而自动选择

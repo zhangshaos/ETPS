@@ -1,9 +1,7 @@
 #include "connectivity.h"
 #include "disjoint_set.h"
-#include "self_check_float.h"
 #include "draw_line.h"
 #include "print_cv_mat.h"
-#include <set>
 #include <opencv2/imgproc.hpp>
 
 
@@ -26,7 +24,7 @@ edge_mat(const cv::Mat_<uchar> &img){
 cv::Mat_<int>
 split_by_edge(const cv::Mat_<int> &label,
               const cv::Mat_<uchar> &edge_,
-              const HyperParams &params){
+              bool verbose){
   constexpr int offset[][2] = {
       {-1, -1},//dx,dy
       { 0, -1},
@@ -143,6 +141,9 @@ split_by_edge(const cv::Mat_<int> &label,
   assert(min_v >= 0);
 #endif
 
+  if(verbose)
+    printf("%s(): result %d clusters.\n", __func__, start_id);
+
   return result;
 }
 
@@ -150,8 +151,7 @@ split_by_edge(const cv::Mat_<int> &label,
 #if 0
 cv::Mat_<int>
 split_by_line(const cv::Mat_<int> &label,
-              const std::vector<cv::Vec4i> &lines_segment,
-              const HyperParams &params){
+              const std::vector<cv::Vec4i> &lines_segment){
   constexpr int offset[][2] = {
       {-1, -1},//dx,dy
       { 0, -1},

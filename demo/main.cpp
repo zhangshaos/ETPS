@@ -12,8 +12,8 @@ void parse(){
 const std::string
 //img_path = "../demo/test_img/texture_compo.png";
 //img_path = "../demo/test_img/UI_seq17_000700.jpg";
-img_path = "../demo/test_img/6h00002.jpg";
-//img_path = "../demo/test_img/UD_000261.jpg";
+//img_path = "../demo/test_img/6h00002.jpg";
+img_path = "../demo/test_img/UD_000261.jpg";
 
 
 int main(int argc, char *argv[]) {
@@ -27,9 +27,8 @@ int main(int argc, char *argv[]) {
   printf("%s\n", cv::typeToString(lab_img.type()).c_str());
 
   HyperParams params;
-  params.expect_spx_num = 2000;
-  params.spatial_scale = 0.3;
-  params.verbose = false;
+  params.expect_spx_num = 1000;
+  params.verbose = true;
   namespace time = std::chrono;
   auto t0 = time::steady_clock::now();
   ccs(rgb_img, params);
