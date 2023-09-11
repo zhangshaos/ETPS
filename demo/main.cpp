@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 
   HyperParams params;
   params.expect_spx_num = 1000;
-  params.verbose = true;
+  params.verbose = false;
   namespace time = std::chrono;
   auto t0 = time::steady_clock::now();
   ccs(rgb_img, params);

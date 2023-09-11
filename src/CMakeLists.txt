@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 
 aux_source_directory(. SRC)
 add_library(CCS STATIC ${SRC})
@@ -16,7 +16,7 @@ target_include_directories(CCS
 
 target_link_libraries(CCS
     PUBLIC
-    opencv_core
+    ${OpenCV_LIBS}
     cpptrace)
 
 target_compile_definitions(CCS
@@ -30,9 +30,11 @@ if(NOT ${ENABLE_CHECK_FLOAT_ERROR})
         N_SELF_CHECK_FLOAT)
 endif()
 
-if (NOT DEFINED CMAKE_DEBUG_POSTFIX)
-    set(CMAKE_DEBUG_POSTFIX "d")
-endif()
 set_target_properties(CCS
     PROPERTIES
-    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
+    POSITION_INDEPENDENT_CODE ON)
+
+#Python wrapper for CCS
+aux_source_directory(./pybind11 PY_SRC)
+pybind11_add_module(pyCCS ${PY_SRC})
+target_link_libraries(pyCCS PRIVATE CCS)
