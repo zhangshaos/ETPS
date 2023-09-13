@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
+#CCS library
 aux_source_directory(. SRC)
 add_library(CCS STATIC ${SRC})
 

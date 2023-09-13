@@ -20,4 +20,4 @@ add_subdirectory(third_party/cpptrace)
 set(PYBIND11_FINDPYTHON ON) #find_package(Python ...), set Python_ROOT_DIR firstly!
 add_subdirectory(third_party/pybind11)
 add_subdirectory(src)
-#add_subdirectory(demo)
+add_subdirectory(demo)

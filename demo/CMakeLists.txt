@@ -12,17 +12,17 @@ target_link_libraries(demo
     argparse::argparse
 )
 
-if (NOT DEFINED CMAKE_DEBUG_POSTFIX)
-    set(CMAKE_DEBUG_POSTFIX "d")
-endif()
-set_target_properties(demo
-    PROPERTIES
-    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
-)
-
 
 add_executable(t_lsd t.cpp)
 target_link_libraries(t_lsd
     PRIVATE
+    ${OpenCV_LIBS}
+)
+
+
+add_executable(demo_sem_seg sem_seg_main.cpp)
+target_link_libraries(demo_sem_seg
+    PRIVATE
+    CCS
     ${OpenCV_LIBS}
 )
