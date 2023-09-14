@@ -12,5 +12,11 @@ npy_u8c3_to_mat(pybind11::array_t<uint8_t> &npy_mat);
 pybind11::array_t<int32_t>
 mat_i32_to_npy(cv::Mat_<int> &mat);
 
+cv::Mat_<float>
+npy_f32cn_to_mat(pybind11::array_t<float> &npy_mat);
+
+cv::Mat_<int>
+npy_i32_to_mat(pybind11::array_t<int32_t> &npy_mat);
+
 
 #endif //CCS_SRC_PYBIND11_MAT_CONVERT_H_

@@ -348,7 +348,7 @@ crf_semantic_seg(const cv::Mat_<int> &spx_label,
         i_end   = (iter % 2 == 0) ? graph.spx_s.size()-1 : 0,
         step    = (iter % 2 == 0) ? 1 : -1;
     bool changed = false;
-    while (i <= i_end){
+    while (i <= i_end){//todo parallel
       if (!graph.spx_s[i].is_valid){
         i += step;
         continue;
@@ -587,7 +587,7 @@ mrf_semantic_seg(const cv::Mat_<int> &spx_label,
         i_end   = (iter % 2 == 0) ? graph.spx_s.size()-1 : 0,
         step    = (iter % 2 == 0) ? 1 : -1;
     bool changed = false;
-    while (i <= i_end){
+    while (i <= i_end){//todo parallel
       if (!graph.spx_s[i].is_valid){
         i += step;
         continue;

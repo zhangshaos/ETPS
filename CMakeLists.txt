@@ -17,6 +17,7 @@ endif()
 find_package(OpenCV CONFIG REQUIRED)
 
 add_subdirectory(third_party/cpptrace)
+message(STATUS "Make sure you set Python_ROOT_DIR...")
 set(PYBIND11_FINDPYTHON ON) #find_package(Python ...), set Python_ROOT_DIR firstly!
 add_subdirectory(third_party/pybind11)
 add_subdirectory(src)
