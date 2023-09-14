@@ -57,6 +57,15 @@ int main(int argc, char *argv[]) {
   save_segmentation_map(result_path1, class_label);
   save_image_with_segmentation(result_path2, rgb_img, class_label);
 
+  MRF_Params params3;
+  params3.wi = 10;
+  class_label = mrf_semantic_seg(spx_label, rgb_img, class_prob, params3);
+
+  result_path1 = str_printf(512, "%s_mrf_seg.png", names[i].c_str());
+  result_path2 = str_printf(512, "%s_mrf_color.png", names[i].c_str());
+  save_segmentation_map(result_path1, class_label);
+  save_image_with_segmentation(result_path2, rgb_img, class_label);
+
 //  HyperParams params;
 //  params.expect_spx_num = 1000;
 //  params.verbose = true;

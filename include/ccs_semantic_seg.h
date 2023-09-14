@@ -37,15 +37,30 @@ naive_semantic_seg(const cv::Mat_<int> &spx_label,
 
 struct CRF_Params{
   int max_iter_num=10;
-  float wi=10, wj=1;//todo config it
+  float wi=10, wj=1;
   bool verbose=true;
 };
 
+//基于条件随机场的语义分割优化方法
 cv::Mat_<int>
 crf_semantic_seg(const cv::Mat_<int> &spx_label,
                  const cv::Mat_<cv::Vec3b> &rgb_img,
                  const cv::Mat_<float> &soft_semantic_score,
                  const CRF_Params &params);
+
+
+struct MRF_Params{
+  int max_iter_num=10;
+  float wi=10, wj=1;
+  bool verbose=true;
+};
+
+//基于马尔科夫随机场的语义分割优化
+cv::Mat_<int>
+mrf_semantic_seg(const cv::Mat_<int> &spx_label,
+                 const cv::Mat_<cv::Vec3b> &rgb_img,
+                 const cv::Mat_<float> &soft_semantic_score,
+                 const MRF_Params &params);
 
 
 #endif //CCS_SRC_CCS_SEMANTIC_SEG_H_
