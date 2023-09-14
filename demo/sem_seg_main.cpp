@@ -58,11 +58,16 @@ main_(int i){
   cv::Mat_<int>
       spx_label   = ccs(rgb_img, params1);
 
+  auto result_path1 = str_printf(512, "%s_spx_seg.png", names[i].c_str()),
+       result_path2 = str_printf(512, "%s_spx_color.png", names[i].c_str());
+  save_segmentation_map(result_path1, spx_label);
+  save_image_with_segmentation(result_path2, rgb_img, spx_label);
+
   cv::Mat_<int>
       class_label = naive_semantic_seg(spx_label, rgb_img, class_prob);
 
-  auto result_path1 = str_printf(512, "%s_naive_seg.png", names[i].c_str()),
-      result_path2 = str_printf(512, "%s_naive_color.png", names[i].c_str());
+  result_path1 = str_printf(512, "%s_naive_seg.png", names[i].c_str()),
+  result_path2 = str_printf(512, "%s_naive_color.png", names[i].c_str());
   save_segmentation_map(result_path1, class_label);
   save_image_with_segmentation(result_path2, rgb_img, class_label);
 
