@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 project(CCS-Demo)
 
-find_package(argparse CONFIG REQUIRED)
+#find_package(argparse CONFIG REQUIRED)
 
 add_executable(demo main.cpp)
 
@@ -9,7 +9,7 @@ target_link_libraries(demo
     PRIVATE
     CCS
     ${OpenCV_LIBS}
-    argparse::argparse
+    #argparse::argparse
 )
 
 
