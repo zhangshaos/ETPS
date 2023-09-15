@@ -239,7 +239,7 @@ class_rgb_mean(const SpxGraph &graph,
           b = clamp2uchar(mean_rgb[j].b / n);
       result[j] = cv::Vec3b{r, g, b};
     } else {
-      result[j] = cv::Vec3b::zeros();
+      result[j] = cv::Vec3b{0, 0, 0};
     }
   }
   return result;

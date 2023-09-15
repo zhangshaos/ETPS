@@ -41,15 +41,50 @@ names       = [
     "085110107701308",
 ]
 
-if __name__ == '__main__':
-    i = 10
-    img_path = f'{img_dir}/{names[i]}.JPG'
-    img = np.asarray(Image.open(img_path).convert('RGB'), dtype=np.uint8)
-    npy_path = f'{npy_dir}/{names[i]}.npy'
-    sem = np.load(npy_path, allow_pickle=False)
 
-    label       = ccs(img, verbose=False)
-    sem_label   = naive_segment(label, img, sem)
-    sem_label   = crf_segment(label, img, sem, verbose=True)
-    sem_label   = mrf_segment(label, img, sem, verbose=True)
+_COLOR_MAP_ = [
+    np.array([255, 204, 153]),
+    np.array([100, 100, 100]),
+    np.array([0, 102, 0]),
+    np.array([51, 255, 255]),
+    np.array([153, 255, 51]),
+    np.array([76, 153, 0]),
+    np.array([255, 51, 51]),
+    np.array([255, 0, 0]),
+    np.array([0, 0, 204]),
+    np.array([64, 64, 64]),
+]
+
+
+def draw_img(rgb_img: np.ndarray, mask: np.ndarray, num_class: int, alpha: float):
+    assert 0 <= alpha and alpha <= 1
+    if len(_COLOR_MAP_) < num_class:
+        for t in range(num_class - len(_COLOR_MAP_)):
+            _COLOR_MAP_.append(np.random.random(3) * 255)
+    result = rgb_img.copy()
+    for id in range(0, num_class):
+        m = (mask == id)
+        result[m] = rgb_img[m] * (1 - alpha) + _COLOR_MAP_[id] * alpha
+    return result
+
+
+def save_draw_img(name: str, rgb_img: np.ndarray, mask: np.ndarray, num_class: int, alpha: float):
+    result = draw_img(rgb_img, mask, num_class, alpha)
+    Image.fromarray(result).save(name)
+
+
+if __name__ == '__main__':
+    for i in range(len(names)):
+        img_path = f'{img_dir}/{names[i]}.JPG'
+        img = np.asarray(Image.open(img_path).convert('RGB'), dtype=np.uint8)
+        npy_path = f'{npy_dir}/{names[i]}.npy'
+        sem = np.load(npy_path, allow_pickle=False)
+
+        label       = ccs(img, verbose=False)
+        sem_label   = naive_segment(label, img, sem)
+        save_draw_img(f'{names[i]}_naive.png', img, sem_label, 10, 0.6)
+        sem_label   = crf_segment(label, img, sem, verbose=False)
+        save_draw_img(f'{names[i]}_crf.png', img, sem_label, 10, 0.6)
+        sem_label   = mrf_segment(label, img, sem, verbose=False)
+        save_draw_img(f'{names[i]}_mrf.png', img, sem_label, 10, 0.6)
     pass
