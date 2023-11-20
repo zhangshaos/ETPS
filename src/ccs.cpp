@@ -166,7 +166,7 @@ update_spx_from_label(std::vector<SuperPixel> &spx_s,
 
   struct RGB_XY_Count{
     cv::Vec<F64, 3> rgb{ 0, 0, 0 };
-    cv::Vec<F64, 2> xy{ 0, 0, 0 };
+    cv::Vec<F64, 2> xy{ 0, 0 };
     int count{ 0 };
   };
   std::vector<RGB_XY_Count> px_counter;

@@ -8,7 +8,7 @@
 cv::Mat_<uchar>
 edge_mat(const cv::Mat_<uchar> &img){
   auto lsd = cv::createLineSegmentDetector(cv::LSD_REFINE_NONE);
-  std::vector<cv::Vec4i> lines;
+  std::vector<cv::Vec4f> lines;
   lsd->detect(img, lines);
   cv::Mat_<uchar> result(img.rows, img.cols, (uchar)0);
   for (const auto &l : lines){
